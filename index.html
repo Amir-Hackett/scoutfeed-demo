@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>scoutfeed — build your own feed</title>
+<meta name="description" content="Interactive demo. Name what you care about and this page scans the news live, ranks it, and shows which three would have been texted to you.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f1f8">
+<meta name="theme-color" content="#0a0a10">
+<meta property="og:title" content="scoutfeed — build your own feed">
+<meta property="og:description" content="Interactive demo. Sample data only — not anyone's real feed.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="scoutfeed">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root {
+  color-scheme: dark;
+  --show-sun: block; --show-moon: none;
+  --bg: #0a0a10;
+  --glow: rgba(124, 92, 240, 0.14);
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.065);
+  --surface-solid: #14141d;
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #ececf4;
+  --text-dim: #a6a6bc;
+  --text-faint: #7e7e98;
+  --accent: #a78bfa;
+  --accent-deep: #7c5cf0;
+  --sent: #6ee7b7;
+  --sent-bd: rgba(110, 231, 183, 0.45);
+  --sent-bg: rgba(110, 231, 183, 0.14);
+  --card-shadow: none;
+  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --show-sun: none; --show-moon: block;
+  --bg: #f3f1f8;
+  --glow: rgba(124, 92, 240, 0.09);
+  --surface: #ffffff;
+  --surface-hover: #faf8ff;
+  --surface-solid: #ffffff;
+  --border: rgba(28, 22, 52, 0.12);
+  --text: #1c1728;
+  --text-dim: #565165;
+  --text-faint: #6c6882;
+  --accent: #6d4de0;
+  --accent-deep: #6d4de0;
+  --sent: #0b825d;
+  --sent-bd: rgba(11, 130, 93, 0.4);
+  --sent-bg: rgba(11, 130, 93, 0.09);
+  --card-shadow: 0 1px 2px rgba(28, 22, 52, 0.06), 0 10px 24px -14px rgba(28, 22, 52, 0.22);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --show-sun: none; --show-moon: block;
+    --bg: #f3f1f8;
+    --glow: rgba(124, 92, 240, 0.09);
+    --surface: #ffffff;
+    --surface-hover: #faf8ff;
+    --surface-solid: #ffffff;
+    --border: rgba(28, 22, 52, 0.12);
+    --text: #1c1728;
+    --text-dim: #565165;
+    --text-faint: #6c6882;
+    --accent: #6d4de0;
+    --accent-deep: #6d4de0;
+    --sent: #0b825d;
+    --sent-bd: rgba(11, 130, 93, 0.4);
+    --sent-bg: rgba(11, 130, 93, 0.09);
+    --card-shadow: 0 1px 2px rgba(28, 22, 52, 0.06), 0 10px 24px -14px rgba(28, 22, 52, 0.22);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  padding: max(28px, env(safe-area-inset-top)) clamp(16px, 4vw, 44px)
+    max(48px, env(safe-area-inset-bottom));
+  background: var(--bg);
+  background-image: radial-gradient(ellipse 90% 45% at 50% -8%, var(--glow), transparent);
+  color: var(--text);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--accent); color: #fff; }
+header, main, footer { max-width: 1120px; margin: 0 auto; }
+a { color: var(--accent); }
+
+.overline {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 4px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent);
+}
+.overline::before { content: ""; width: 28px; height: 2px; border-radius: 2px;
+  background: var(--accent); }
+h1 {
+  margin: 6px 0 10px; font-family: var(--serif);
+  font-size: clamp(40px, 8.5vw, 56px); font-weight: 700;
+  letter-spacing: -0.015em; line-height: 1.05;
+}
+.tag { margin: 0 0 14px; font-size: 17px; color: var(--text-dim); max-width: 54ch; }
+
+.demo {
+  display: flex; gap: 12px; align-items: flex-start;
+  margin: 0 0 22px; padding: 14px 18px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 14px;
+}
+.demo .badge {
+  flex: none; margin-top: 1px; padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-deep); color: #fff;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.demo p { margin: 0; font-size: 14.5px; color: var(--text-dim); }
+.demo strong { color: var(--text); }
+
+.search {
+  position: sticky; top: 10px; z-index: 30;
+  display: flex; align-items: center; gap: 10px;
+  margin: 24px 0 0; padding: 0 18px; min-height: 52px;
+  background: color-mix(in srgb, var(--surface-solid) 84%, transparent);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--card-shadow);
+}
+.search:focus-within { border-color: var(--accent); }
+.search > svg { width: 17px; height: 17px; color: var(--text-faint); flex: none; }
+.search input {
+  flex: 1; min-width: 0; border: 0; background: none; color: var(--text);
+  font: inherit; font-size: 16px; padding: 13px 0; outline: none;
+}
+.search input::placeholder { color: var(--text-faint); }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.theme {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; margin-right: -10px; padding: 0;
+  border: 0; border-radius: 999px; background: none; color: var(--text-faint);
+  cursor: pointer;
+}
+.theme:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme svg { width: 18px; height: 18px; }
+.sun { display: var(--show-sun); } .moon { display: var(--show-moon); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 0; }
+.chips .lbl {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-faint); margin-right: 2px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-dim);
+  border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13.5px;
+  font-weight: 600; cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, transform .15s ease;
+}
+.chip:hover { background: var(--surface-hover); border-color: var(--accent); color: var(--accent);
+  transform: translateY(-1px); }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip.on {
+  background: var(--accent-deep); border-color: var(--accent-deep); color: #fff;
+  padding-right: 8px; cursor: default;
+}
+.chip.on:hover { transform: none; color: #fff; }
+.chip .x {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: 0; border-radius: 999px;
+  background: rgba(255,255,255,.18); color: #fff; font: inherit; font-size: 14px;
+  line-height: 1; cursor: pointer;
+}
+.chip .x:hover { background: rgba(255,255,255,.34); }
+.chip .x:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+h2 {
+  display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px;
+  font-size: 13.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-dim); font-variant-numeric: tabular-nums;
+}
+h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.count { font-weight: 600; color: var(--text-faint); letter-spacing: 0.06em; }
+section { margin-top: 34px; }
+
+.grid { list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+.card { position: relative; height: 216px; }
+.face {
+  position: absolute; inset: 0; overflow: hidden;
+  width: 100%; text-align: left; text-decoration: none; color: inherit;
+  padding: 14px 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--card-shadow);
+  display: flex; flex-direction: column; gap: 7px;
+  transition: border-color .15s ease, background .15s ease, transform .18s ease;
+}
+a.face:hover { background: var(--surface-hover); border-color: var(--accent);
+  transform: translateY(-2px); }
+a.face:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card.sent .face { border-color: var(--sent-bd); background-image: linear-gradient(var(--sent-bg), var(--sent-bg)); }
+.card.has-thumb .face { padding-right: 130px; }
+.thumb {
+  position: absolute; right: 12px; top: 12px;
+  width: 104px; height: calc(100% - 24px);
+  object-fit: cover; border-radius: 10px; background: var(--surface-solid);
+}
+.meta {
+  margin: 0; display: flex; align-items: center; gap: 7px;
+  white-space: nowrap; overflow: hidden;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.meta .src { color: var(--accent); flex: none; }
+.meta .sect { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.meta time { flex: none; }
+.meta .sep { opacity: .5; }
+.meta time { font-weight: 500; letter-spacing: 0.02em; font-size: 12px;
+  text-transform: none; }
+.title {
+  margin: 0; font-family: var(--serif); font-size: 17px; font-weight: 700;
+  line-height: 1.3; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.snippet {
+  margin: 0; color: var(--text-dim); font-size: 13.5px; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card.no-snippet .title { -webkit-line-clamp: 5; }
+.foot { margin-top: auto; display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; }
+.why {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border-radius: 999px; padding: 4px 10px;
+}
+.texted {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--sent); border: 1px solid var(--sent-bd); background: var(--sent-bg);
+  border-radius: 999px; padding: 3px 9px;
+}
+.texted svg { width: 11px; height: 11px; }
+.strength { margin-left: auto; display: flex; gap: 3px; align-items: center; }
+.strength i { width: 5px; height: 5px; border-radius: 999px;
+  background: var(--text-faint); opacity: .35; }
+.strength i.on { background: var(--accent); opacity: 1; }
+
+.card.skel .face { border-style: dashed; }
+.bone { border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-solid) 25%,
+    color-mix(in srgb, var(--surface-solid) 55%, var(--text)) 37%, var(--surface-solid) 63%);
+  background-size: 400% 100%; animation: sweep 1.4s ease-in-out infinite; }
+.bone.m { width: 46%; height: 10px; }
+.bone.t1 { width: 88%; height: 16px; }
+.bone.t2 { width: 62%; height: 16px; }
+.bone.s1 { width: 96%; height: 11px; }
+.bone.f { width: 38%; height: 20px; border-radius: 999px; margin-top: auto; }
+.bone.th { position: absolute; right: 12px; top: 12px; width: 104px;
+  height: calc(100% - 24px); border-radius: 10px; }
+@keyframes sweep { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .bone { animation: none; }
+  html { scroll-behavior: auto; }
+  .card, .chip, a.face { transition: none; }
+}
+
+.empty {
+  padding: 30px 22px; border: 1px dashed var(--border); border-radius: 14px;
+  background: var(--surface); color: var(--text-dim); font-size: 14.5px;
+  text-align: center;
+}
+.stats { margin: 12px 0 0; font-size: 13px; color: var(--text-faint); }
+footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--border);
+  font-size: 13.5px; color: var(--text-faint); }
+footer p { margin: 0 0 8px; }
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="overline">Interactive demo</p>
+  <h1>scoutfeed</h1>
+  <p class="tag">Everything the scout matched — texted or not. The phone gets the
+    top three; nothing else gets missed.</p>
+
+  <div class="demo">
+    <span class="badge">Demo</span>
+    <p><strong>This is not anyone's feed.</strong> It starts empty. Name the
+      things you care about and this page scans the news live — Hacker News and
+      The Guardian, queried from your browser the moment you add an interest —
+      then ranks what came back and marks the three it would have texted you.
+      Your interests stay on your device.</p>
+  </div>
+
+  <div class="search" role="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" aria-hidden="true">
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"></path>
+      <circle cx="12" cy="12" r="3.2"></circle>
+    </svg>
+    <label class="sr" for="q">Add an interest</label>
+    <input id="q" type="text" autocomplete="off" spellcheck="false"
+      placeholder="Add an interest and press Enter — try &ldquo;Arsenal&rdquo;">
+    <button class="theme" id="theme" type="button" aria-label="Toggle theme">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path>
+      </svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="chips" id="mine"></div>
+  <div class="chips" id="suggest">
+    <span class="lbl">Try</span>
+    <button class="chip" type="button">Arsenal</button>
+    <button class="chip" type="button">Anthropic</button>
+    <button class="chip" type="button">Formula 1</button>
+    <button class="chip" type="button">Rust</button>
+    <button class="chip" type="button">Nintendo</button>
+  </div>
+</header>
+
+<main>
+  <section id="feed-sec">
+    <h2>Matched <span class="count" id="cnt"></span></h2>
+    <div id="feed">
+      <p class="empty">Add an interest above. Everything the scan finds lands
+        here, newest and strongest first.</p>
+    </div>
+    <p class="stats" id="stats" hidden></p>
+  </section>
+</main>
+
+<footer>
+  <p><strong>Two live sources, queried in your browser.</strong> Hacker News
+    (via Algolia) and The Guardian's open test key are the two news APIs that a
+    static page can call without a server or a secret. The real scoutfeed reads
+    a few dozen RSS feeds on a schedule, scores each story against a long-lived
+    interest profile, and texts the top three.</p>
+  <p>Sample data only — no one's real feed, and nothing here is sent anywhere.</p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var LS_INT = "sf-demo-interests";
+  var LS_THEME = "sf-demo-theme";
+  var TEXT_TOP = 3;      // the phone gets the top three — same rule as the real one
+  var SKELETONS = 6;
+  var PER_SOURCE = 6;
+  var HN_WINDOW_DAYS = 90;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var interests = [];
+  var scanSeq = 0;
+
+  /* ---------- theme ---------- */
+  try {
+    var saved = localStorage.getItem(LS_THEME);
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) {}
+  $("theme").addEventListener("click", function () {
+    var cur = document.documentElement.getAttribute("data-theme");
+    if (!cur) cur = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    var next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(LS_THEME, next); } catch (e) {}
+  });
+
+  /* ---------- helpers ---------- */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function stripTags(s) {
+    return String(s == null ? "" : s).replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, " ").trim();
+  }
+  function el(html) {
+    var t = document.createElement("template");
+    t.innerHTML = html.trim();
+    return t.content.firstElementChild;
+  }
+  // Only ever render an http(s) URL — the same rule the real renderer enforces.
+  function safeUrl(u) {
+    try {
+      var p = new URL(u, location.href);
+      return (p.protocol === "http:" || p.protocol === "https:") ? p.href : "";
+    } catch (e) { return ""; }
+  }
+  function ago(ts) {
+    var s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 90) return "just now";
+    var m = Math.round(s / 60);
+    if (m < 60) return m + "m ago";
+    var h = Math.round(m / 60);
+    if (h < 24) return h + "h ago";
+    var d = Math.round(h / 24);
+    return d === 1 ? "yesterday" : d + "d ago";
+  }
+
+  /* ---------- sources ---------- */
+  // Algolia ranks by relevance over the whole archive, so a bare query answers
+  // "arsenal" with a 2017 story about nuclear weapons. This is meant to show
+  // what is happening NOW, so the window is the filter, not the tiebreak — and
+  // it only widens when a genuinely niche interest comes back empty.
+  function hnQuery(term, sinceSec) {
+    var u = "https://hn.algolia.com/api/v1/search?tags=story&hitsPerPage=" +
+      PER_SOURCE + "&query=" + encodeURIComponent(term) +
+      (sinceSec ? "&numericFilters=" + encodeURIComponent("created_at_i>" + sinceSec) : "");
+    return fetch(u).then(function (r) { return r.ok ? r.json() : { hits: [] }; })
+      .catch(function () { return { hits: [] }; });
+  }
+
+  function hn(term) {
+    var cut = Math.floor(Date.now() / 1000) - HN_WINDOW_DAYS * 86400;
+    return hnQuery(term, cut)
+      .then(function (j) {
+        if ((j.hits || []).length >= 2) return j;
+        return hnQuery(term, 0);          // nothing recent — fall back to all time
+      })
+      .then(function (j) {
+        return (j.hits || []).map(function (x) {
+          var link = safeUrl(x.url || ("https://news.ycombinator.com/item?id=" + x.objectID));
+          if (!link || !x.title) return null;
+          return {
+            id: "hn:" + x.objectID, source: "Hacker News", sect: "", link: link,
+            title: x.title, snippet: stripTags(x.story_text || "").slice(0, 220),
+            thumb: "", ts: new Date(x.created_at).getTime(),
+            heat: Math.min(1, (x.points || 0) / 250), interest: term
+          };
+        }).filter(Boolean);
+      }).catch(function () { return []; });
+  }
+
+  function guardian(term) {
+    // A bare q= searches the article body, which answers "Arsenal" with any
+    // match report that merely mentions them. Restricting the query to the
+    // headline and standfirst is what makes a hit mean the story is ABOUT it.
+    var u = "https://content.guardianapis.com/search?api-key=test&order-by=newest" +
+      "&query-fields=headline%2Cstandfirst" +
+      "&page-size=" + PER_SOURCE + "&show-fields=trailText,thumbnail&q=" +
+      encodeURIComponent(term);
+    return fetch(u).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var rows = (((j || {}).response || {}).results) || [];
+        return rows.map(function (x) {
+          var link = safeUrl(x.webUrl);
+          if (!link || !x.webTitle) return null;
+          var f = x.fields || {};
+          return {
+            id: "gu:" + x.id, source: "The Guardian", sect: x.sectionName || "",
+            link: link, title: x.webTitle,
+            snippet: stripTags(f.trailText || "").slice(0, 220),
+            thumb: safeUrl(f.thumbnail || ""),
+            ts: new Date(x.webPublicationDate).getTime(),
+            heat: 0.45, interest: term
+          };
+        }).filter(Boolean);
+      }).catch(function () { return []; });
+  }
+
+  /* ---------- scoring ----------
+     A deliberately simple stand-in for the real scorer: how squarely the story
+     hits the interest, how fresh it is, and how much the source's own crowd
+     reacted. Enough to make the ranking legible, not a claim to be the real
+     model. */
+  function score(item) {
+    var t = (item.title + " " + item.snippet).toLowerCase();
+    var needle = item.interest.toLowerCase();
+    var hit = t.indexOf(needle) >= 0 ? 1 : 0;
+    var titleHit = item.title.toLowerCase().indexOf(needle) >= 0 ? 1 : 0;
+    var ageH = (Date.now() - item.ts) / 3600000;
+    var fresh = ageH < 6 ? 1 : ageH < 24 ? 0.9 : ageH < 72 ? 0.75
+      : ageH < 168 ? 0.6 : ageH < 720 ? 0.4 : ageH < 2160 ? 0.25 : 0.05;
+    return 0.28 * hit + 0.22 * titleHit + 0.40 * fresh + 0.10 * item.heat;
+  }
+
+  /* ---------- interests ---------- */
+  function load() {
+    try {
+      var raw = localStorage.getItem(LS_INT);
+      if (raw) interests = JSON.parse(raw) || [];
+    } catch (e) { interests = []; }
+    if (!Array.isArray(interests)) interests = [];
+  }
+  function save() {
+    try { localStorage.setItem(LS_INT, JSON.stringify(interests)); } catch (e) {}
+  }
+  function add(term) {
+    term = String(term || "").trim().slice(0, 40);
+    if (!term) return;
+    var dupe = interests.some(function (i) {
+      return i.toLowerCase() === term.toLowerCase();
+    });
+    if (!dupe) { interests.push(term); save(); renderChips(); scan(); }
+    $("q").value = "";
+  }
+  function remove(term) {
+    interests = interests.filter(function (i) { return i !== term; });
+    save(); renderChips(); scan();
+  }
+  function renderChips() {
+    var box = $("mine");
+    box.innerHTML = "";
+    if (!interests.length) return;
+    box.appendChild(el('<span class="lbl">Watching</span>'));
+    interests.forEach(function (t) {
+      var c = el('<span class="chip on">' + esc(t) +
+        '<button class="x" type="button" aria-label="Stop watching ' + esc(t) +
+        '">×</button></span>');
+      c.querySelector(".x").addEventListener("click", function () { remove(t); });
+      box.appendChild(c);
+    });
+  }
+
+  $("q").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); add(this.value); }
+  });
+  Array.prototype.forEach.call($("suggest").querySelectorAll(".chip"), function (b) {
+    b.addEventListener("click", function () { add(b.textContent); });
+  });
+
+  /* ---------- scan ---------- */
+  function skeletonHtml(withThumb) {
+    return '<li class="card skel' + (withThumb ? " has-thumb" : "") + '">' +
+      '<div class="face">' +
+        (withThumb ? '<span class="bone th"></span>' : "") +
+        '<span class="bone m"></span><span class="bone t1"></span>' +
+        '<span class="bone t2"></span><span class="bone s1"></span>' +
+        '<span class="bone f"></span>' +
+      "</div></li>";
+  }
+
+  function scan() {
+    var mine = ++scanSeq;
+    var box = $("feed");
+    if (!interests.length) {
+      $("cnt").textContent = "";
+      $("stats").hidden = true;
+      box.innerHTML = '<p class="empty">Add an interest above. Everything the ' +
+        "scan finds lands here, newest and strongest first.</p>";
+      return;
+    }
+    $("cnt").textContent = "scanning…";
+    var skel = [];
+    for (var i = 0; i < SKELETONS; i++) skel.push(skeletonHtml(i % 3 === 1));
+    box.innerHTML = '<ul class="grid">' + skel.join("") + "</ul>";
+
+    var jobs = [];
+    interests.forEach(function (t) { jobs.push(hn(t), guardian(t)); });
+
+    Promise.all(jobs).then(function (chunks) {
+      if (mine !== scanSeq) return;
+      var seen = {}, all = [];
+      chunks.forEach(function (rows) {
+        rows.forEach(function (r) {
+          if (seen[r.id]) return;
+          seen[r.id] = 1;
+          r.score = score(r);
+          all.push(r);
+        });
+      });
+      all.sort(function (a, b) { return b.score - a.score || b.ts - a.ts; });
+      paint(all);
+    });
+  }
+
+  function paint(rows) {
+    var box = $("feed");
+    $("cnt").textContent = rows.length
+      ? rows.length + (rows.length === 1 ? " story" : " stories")
+      : "nothing found";
+    if (!rows.length) {
+      $("stats").hidden = true;
+      box.innerHTML = '<p class="empty">Neither source had anything for that. ' +
+        "Try a broader interest — a team, a company, a language.</p>";
+      return;
+    }
+    var ul = el('<ul class="grid"></ul>');
+    rows.forEach(function (r, i) {
+      var texted = i < TEXT_TOP;
+      var bars = Math.max(1, Math.min(4, Math.round(r.score * 4)));
+      var dots = "";
+      for (var b = 0; b < 4; b++) dots += '<i class="' + (b < bars ? "on" : "") + '"></i>';
+      ul.appendChild(el(
+        '<li class="card' + (texted ? " sent" : "") + (r.thumb ? " has-thumb" : "") +
+          (r.snippet ? "" : " no-snippet") + '">' +
+          '<a class="face" href="' + esc(r.link) + '" target="_blank" rel="noopener noreferrer">' +
+            (r.thumb ? '<img class="thumb" src="' + esc(r.thumb) +
+              '" alt="" loading="lazy" decoding="async">' : "") +
+            '<p class="meta"><span class="src">' + esc(r.source) + "</span>" +
+              '<span class="sep">·</span><time>' + esc(ago(r.ts)) + "</time>" +
+              (r.sect ? '<span class="sep">·</span><span class="sect">' +
+                esc(r.sect) + "</span>" : "") + "</p>" +
+            '<h3 class="title">' + esc(r.title) + "</h3>" +
+            (r.snippet ? '<p class="snippet">' + esc(r.snippet) + "</p>" : "") +
+            '<span class="foot">' +
+              '<span class="why">' + esc(r.interest) + "</span>" +
+              (texted ? '<span class="texted">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ' +
+                'aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Texted</span>' : "") +
+              '<span class="strength" role="img" aria-label="Match strength ' +
+                bars + ' of 4">' + dots + "</span>" +
+            "</span>" +
+          "</a>" +
+        "</li>"));
+    });
+    box.innerHTML = "";
+    box.appendChild(ul);
+
+    var textedCount = Math.min(TEXT_TOP, rows.length);
+    $("stats").hidden = false;
+    $("stats").textContent = rows.length + " matched across " + interests.length +
+      (interests.length === 1 ? " interest" : " interests") + " · " + textedCount +
+      " would have reached the phone · the rest wait here.";
+  }
+
+  /* ---------- boot ---------- */
+  load();
+  renderChips();
+  scan();
+})();
+</script>
+</body>
+</html>
