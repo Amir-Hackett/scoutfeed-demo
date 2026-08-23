@@ -1,6 +1,6 @@
 # scoutfeed (demo)
 
-The live demo behind [amir-hackett.github.io/scoutfeed](https://amir-hackett.github.io/scoutfeed/).
+The live demo behind [amir-hackett.github.io/scoutfeed-demo](https://amir-hackett.github.io/scoutfeed-demo/).
 
 **Sample data only.** The page ships empty. You name the things you care about,
 and it queries [Hacker News](https://hn.algolia.com/api) and
